@@ -1,42 +1,17 @@
 import SwiftUI
 
-/// Settings > Monitors: websites checked over HTTP(S) and servers checked over SSH.
+/// Settings > Servers: servers checked over SSH.
 /// Adding, editing or switching one saves right away and checks it.
 struct MonitorsSettingsSection: View {
     @Bindable var settings: AppSettings
     var infra: InfraMonitor
-    @State private var websites: [WebsiteMonitor] = []
     @State private var servers: [ServerMonitor] = []
-    @State private var newURL = ""
     @State private var newAlias = ""
 
-    private var trimmedURL: String { newURL.trimmingCharacters(in: .whitespaces) }
     private var trimmedAlias: String { newAlias.trimmingCharacters(in: .whitespaces) }
 
     var body: some View {
         Group {
-            Section("Websites") {
-                ForEach($websites) { $site in
-                    WebsiteRow(site: $site, result: infra.results[site.id], checking: infra.checking.contains(site.id),
-                               onRemove: { websites.removeAll { $0.id == site.id } },
-                               onCommit: { check(site.id) })
-                }
-                HStack {
-                    TextField("Add website", text: $newURL, prompt: Text("https://example.com"))
-                        .labelsHidden()
-                        .onSubmit(addWebsite)
-                    Button("Add", action: addWebsite)
-                        .disabled(WebsiteMonitor.parse(trimmedURL) == nil)
-                }
-                Picker("Check every", selection: $settings.websiteCheckInterval) {
-                    ForEach(AppSettings.intervalOptions, id: \.value) { Text($0.label).tag($0.value) }
-                }
-                Text("HTTP status, response time, TLS certificate expiry and, when set, a keyword the page must contain. Click a site to edit it.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
             Section("Servers") {
                 ForEach($servers) { $server in
                     ServerRow(server: $server, result: infra.results[server.id], checking: infra.checking.contains(server.id),
@@ -65,33 +40,18 @@ struct MonitorsSettingsSection: View {
             }
         }
         .onAppear {
-            websites = settings.websites
             servers = settings.servers
-        }
-        .onChange(of: websites) { _, websites in
-            settings.websites = websites
-            infra.websites = websites
-            infra.prune()
         }
         .onChange(of: servers) { _, servers in
             settings.servers = servers
             infra.servers = servers
             infra.prune()
         }
-        .onChange(of: settings.websiteCheckInterval) { _, interval in infra.websiteInterval = interval }
         .onChange(of: settings.serverCheckInterval) { _, interval in infra.serverInterval = interval }
     }
 
     private var canAddServer: Bool {
         RemoteUsage.isValidHost(trimmedAlias) && !servers.contains { $0.alias == trimmedAlias }
-    }
-
-    private func addWebsite() {
-        guard let url = WebsiteMonitor.parse(trimmedURL) else { return }
-        let site = WebsiteMonitor(url: url.absoluteString)
-        websites.append(site)
-        newURL = ""
-        check(site.id)
     }
 
     private func addServer() {
@@ -175,78 +135,6 @@ private func statusLine(_ result: CheckResult?, enabled: Bool, checking: Bool) -
     let time = result.checkedAt.formatted(date: .omitted, time: .shortened)
     let problems = result.problems.prefix(2).map { "\($0.name): \($0.value)" }
     return (problems.isEmpty ? result.summary : problems.joined(separator: " · ")) + " · \(time)"
-}
-
-private struct WebsiteRow: View {
-    @Binding var site: WebsiteMonitor
-    let result: CheckResult?
-    let checking: Bool
-    let onRemove: () -> Void
-    let onCommit: () -> Void
-    @State private var editing = false
-    @State private var name = ""
-    @State private var url = ""
-    @State private var keyword = ""
-    @State private var slow = ""
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 6) {
-                StatusDot(result: result, enabled: site.enabled)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(site.name).lineLimit(1).truncationMode(.middle)
-                    Text(site.url).font(.caption2).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-                }
-                .contentShape(Rectangle())
-                .onTapGesture(perform: startEditing)
-                .help("Click to edit")
-                Spacer()
-                RowControls(checking: checking, enabled: $site.enabled, onToggle: onCommit, onRemove: onRemove)
-            }
-
-            if editing {
-                TextField("Name", text: $name, prompt: Text("Name"))
-                TextField("URL", text: $url, prompt: Text("https://example.com"))
-                TextField("Keyword", text: $keyword, prompt: Text("Text the page must contain (optional)"))
-                TextField("Slow after (ms)", text: $slow, prompt: Text("3000"))
-                HStack {
-                    Hint(text: WebsiteMonitor.parse(url) == nil ? "Enter an http(s) URL." : "Return to save, Esc to cancel.",
-                         status: WebsiteMonitor.parse(url) == nil ? .degraded : nil)
-                    Spacer()
-                    Button("Cancel") { editing = false }
-                    Button("Save", action: commit)
-                        .disabled(WebsiteMonitor.parse(url) == nil)
-                }
-                .font(.caption2)
-                .buttonStyle(.borderless)
-            } else {
-                Hint(text: statusLine(result, enabled: site.enabled, checking: checking), status: problem(result, site.enabled))
-                    .font(.caption2)
-            }
-        }
-        .textFieldStyle(.roundedBorder)
-        .onSubmit(commit)
-        .onExitCommand { editing = false }
-    }
-
-    private func startEditing() {
-        name = site.name
-        url = site.url
-        keyword = site.keyword
-        slow = String(site.slowMs)
-        editing = true
-    }
-
-    private func commit() {
-        guard editing, let parsed = WebsiteMonitor.parse(url) else { return }
-        site.url = parsed.absoluteString
-        let trimmedName = name.trimmingCharacters(in: .whitespaces)
-        site.name = trimmedName.isEmpty ? (parsed.host ?? site.url) : trimmedName
-        site.keyword = keyword.trimmingCharacters(in: .whitespaces)
-        if let ms = Int(slow.trimmingCharacters(in: .whitespaces)), ms > 0 { site.slowMs = ms }
-        editing = false
-        onCommit()
-    }
 }
 
 private struct ServerRow: View {

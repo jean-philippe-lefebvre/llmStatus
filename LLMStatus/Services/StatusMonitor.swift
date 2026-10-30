@@ -6,7 +6,7 @@ class StatusMonitor {
     let notificationManager = NotificationManager()
     /// Weekly limits of the Claude / Codex subscriptions (independent of status pages)
     let usage = UsageMonitor()
-    /// Websites and servers checked by this app (Settings > Monitors)
+    /// Servers checked by this app (Settings > Servers)
     let infra = InfraMonitor()
     var notificationsEnabled = true
     var notifyProviderID = "all"
@@ -52,7 +52,7 @@ class StatusMonitor {
     }
 
     /// Status for the menu bar icon — either a specific provider or aggregated.
-    /// A website or server problem shows whichever provider is selected.
+    /// A server problem shows whichever provider is selected.
     func menuBarStatus(for providerID: String) -> ServiceStatus {
         let status = providerID == "all"
             ? aggregatedStatus

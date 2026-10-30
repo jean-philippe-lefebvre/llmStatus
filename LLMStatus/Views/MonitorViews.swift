@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// One website or server in the popover gallery. Tapping it opens `MonitorDetailView`.
+/// One server in the popover gallery. Tapping it opens `MonitorDetailView`.
 struct MonitorCardView: View {
     let name: String
     let result: CheckResult?
@@ -72,12 +72,11 @@ struct MonitorCardView: View {
     }
 }
 
-/// Every check of a website or server, worst first, with a link to the site.
+/// Every check of a server, worst first.
 struct MonitorDetailView: View {
     let name: String
     let subtitle: String
     let result: CheckResult?
-    let link: URL?
     let checking: Bool
     let recheck: () -> Void
 
@@ -136,9 +135,6 @@ struct MonitorDetailView: View {
                         .foregroundStyle(.tertiary)
                 }
                 Spacer()
-                if let link {
-                    Link("Open", destination: link)
-                }
             }
             .font(.caption)
             .buttonStyle(.borderless)

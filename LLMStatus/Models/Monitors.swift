@@ -1,35 +1,6 @@
 import Foundation
 
-/// A website checked over HTTP(S), set up in Settings > Monitors.
-struct WebsiteMonitor: Codable, Hashable, Identifiable {
-    var id = UUID()
-    var name: String
-    var url: String
-    var enabled = true
-    /// Text the page must contain; empty skips the check.
-    var keyword = ""
-    /// Answers slower than this are shown as degraded.
-    var slowMs = 3000
-
-    init(name: String = "", url: String) {
-        self.url = url
-        self.name = name.isEmpty ? (URL(string: url)?.host ?? url) : name
-    }
-
-    /// http(s) URL with a host, or nil.
-    var parsedURL: URL? { Self.parse(url) }
-
-    /// "example.com" becomes "https://example.com".
-    static func parse(_ text: String) -> URL? {
-        var text = text.trimmingCharacters(in: .whitespaces)
-        if !text.contains("://") { text = "https://" + text }
-        guard let url = URL(string: text), ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
-              url.host?.isEmpty == false else { return nil }
-        return url
-    }
-}
-
-/// A server checked over SSH, set up in Settings > Monitors.
+/// A server checked over SSH, set up in Settings > Servers.
 /// Disk space, inodes, memory, load and failed systemd units are always checked;
 /// services, containers and ports only when listed.
 struct ServerMonitor: Codable, Hashable, Identifiable {
@@ -68,17 +39,17 @@ struct ServerMonitor: Codable, Hashable, Identifiable {
     }
 }
 
-/// One line of a check: "Disk /", "nginx", "HTTP"...
+/// One line of a check: "Disk /", "nginx", "Port 443"...
 struct CheckItem: Hashable {
     var name: String
     var status: ServiceStatus
     var value: String
 }
 
-/// Last check of a website or server.
+/// Last check of a server.
 struct CheckResult: Equatable {
     var status: ServiceStatus
-    /// Short line for the card when everything is fine, e.g. "200 · 340 ms".
+    /// Short line for the card when everything is fine, e.g. "Disk 45% · load 0.50".
     var summary: String
     var items: [CheckItem] = []
     var checkedAt = Date()

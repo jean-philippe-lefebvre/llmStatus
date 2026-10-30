@@ -173,27 +173,14 @@ class AppSettings {
         }
     }
 
-    // MARK: - Websites and servers
+    // MARK: - Servers
 
-    /// Websites checked over HTTP(S), as JSON `[WebsiteMonitor]`.
-    @ObservationIgnored
-    @AppStorage("monitorWebsites") var monitorWebsitesJSON: String = ""
     /// Servers checked over SSH, as JSON `[ServerMonitor]`.
     @ObservationIgnored
     @AppStorage("monitorServers") var monitorServersJSON: String = ""
     @ObservationIgnored
-    @AppStorage("websiteInterval") var websiteInterval: TimeInterval = 60
-    @ObservationIgnored
     @AppStorage("serverInterval") var serverInterval: TimeInterval = 300
     private var monitorsTick = 0
-
-    var websites: [WebsiteMonitor] {
-        get { _ = monitorsTick; return (try? JSONDecoder().decode([WebsiteMonitor].self, from: Data(monitorWebsitesJSON.utf8))) ?? [] }
-        set {
-            monitorWebsitesJSON = (try? String(decoding: JSONEncoder().encode(newValue), as: UTF8.self)) ?? ""
-            monitorsTick += 1
-        }
-    }
 
     var servers: [ServerMonitor] {
         get { _ = monitorsTick; return (try? JSONDecoder().decode([ServerMonitor].self, from: Data(monitorServersJSON.utf8))) ?? [] }
@@ -201,11 +188,6 @@ class AppSettings {
             monitorServersJSON = (try? String(decoding: JSONEncoder().encode(newValue), as: UTF8.self)) ?? ""
             monitorsTick += 1
         }
-    }
-
-    var websiteCheckInterval: TimeInterval {
-        get { _ = monitorsTick; return websiteInterval }
-        set { websiteInterval = newValue; monitorsTick += 1 }
     }
 
     var serverCheckInterval: TimeInterval {

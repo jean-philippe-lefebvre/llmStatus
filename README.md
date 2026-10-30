@@ -58,11 +58,10 @@ For each host, LLM Status runs a read-only Python 3 script over `ssh -o BatchMod
 
 Copies of the same data (backups, restore checks) are counted once: the most complete copy of a Codex session or Hermes row, and usage lines by `id` (or identical content across files).
 
-## Websites and servers (optional)
+## Servers (optional)
 
-Under **Settings → Monitors**, add websites and servers to watch next to the providers. They show as "Websites" and "Servers" cards in the popover (tap one for every check), turn the menu bar cloud to the worst status, and send a notification when one goes down, gets worse or recovers. A failure is checked again 3 seconds later before it counts, and nothing is checked while this Mac is offline.
+Under **Settings → Servers**, add servers to watch next to the providers. They show as "Servers" cards in the popover (tap one for every check), turn the menu bar cloud to the worst status, and send a notification when one goes down, gets worse or recovers. A failure is checked again 3 seconds later before it counts, and nothing is checked while this Mac is offline.
 
-- **Websites** (every 1 to 10 min): HTTP status (4xx major outage, 5xx or no answer critical), response time (degraded past a threshold, 3000 ms by default), TLS certificate expiry (degraded under 14 days, major under 7) and, optionally, a keyword the page must contain.
 - **Servers** (every 1 to 15 min), by SSH alias: SSH answer time, disk space and inodes of every real filesystem (80 % / 90 % by default, per server), memory available, load per CPU, failed systemd units, plus the systemd services, Docker containers and listening TCP ports you list. A read-only POSIX `sh` script runs over `ssh -o BatchMode=yes` (key-based login required, no Python needed; `sudo -n` is used when allowed, which Docker needs unless the login user is in the `docker` group).
 
 ## Requirements

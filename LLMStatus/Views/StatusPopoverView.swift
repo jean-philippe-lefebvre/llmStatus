@@ -9,7 +9,7 @@ struct StatusPopoverView: View {
     @AppStorage("collapsedUsageGroups") private var collapsedUsageGroups = ""
     /// Provider whose components are shown in place of the gallery.
     @State private var selectedProviderID: String?
-    /// Website or server whose checks are shown in place of the gallery.
+    /// Server whose checks are shown in place of the gallery.
     @State private var selectedMonitorID: UUID?
 
     private var selectedProvider: ServiceProvider? {
@@ -52,7 +52,7 @@ struct StatusPopoverView: View {
                 SettingsView(settings: settings, monitor: monitor)
                     .frame(height: min(640, FittingScrollView<EmptyView>.maxHeight))
             } else if let id = selectedMonitorID {
-                detailHeader("Monitors") { selectedMonitorID = nil }
+                detailHeader("Servers") { selectedMonitorID = nil }
 
                 Divider()
 
@@ -226,31 +226,18 @@ struct StatusPopoverView: View {
         }
     }
 
-    // MARK: - Websites and servers
+    // MARK: - Servers
 
     @ViewBuilder
     private var monitorSections: some View {
         let infra = monitor.infra
-        let websites = infra.ordered(infra.enabledWebsites)
         let servers = infra.ordered(infra.enabledServers)
-        if !websites.isEmpty || !servers.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                if !websites.isEmpty {
-                    monitorGrid("Websites") {
-                        ForEach(websites) { site in
-                            MonitorCardView(name: site.name, result: infra.results[site.id], checking: infra.checking.contains(site.id))
-                                .onTapGesture { selectedMonitorID = site.id }
-                        }
-                    }
-                }
-                if !servers.isEmpty {
-                    monitorGrid("Servers") {
-                        ForEach(servers) { server in
-                            MonitorCardView(name: server.displayName, result: infra.results[server.id],
-                                            checking: infra.checking.contains(server.id))
-                                .onTapGesture { selectedMonitorID = server.id }
-                        }
-                    }
+        if !servers.isEmpty {
+            monitorGrid("Servers") {
+                ForEach(servers) { server in
+                    MonitorCardView(name: server.displayName, result: infra.results[server.id],
+                                    checking: infra.checking.contains(server.id))
+                        .onTapGesture { selectedMonitorID = server.id }
                 }
             }
             .padding(12)
@@ -272,11 +259,8 @@ struct StatusPopoverView: View {
     private func monitorDetail(_ id: UUID) -> some View {
         let infra = monitor.infra
         let recheck = { Task { await infra.check(id: id) } }
-        if let site = infra.websites.first(where: { $0.id == id }) {
-            MonitorDetailView(name: site.name, subtitle: site.url, result: infra.results[id], link: site.parsedURL,
-                              checking: infra.checking.contains(id), recheck: { _ = recheck() })
-        } else if let server = infra.servers.first(where: { $0.id == id }) {
-            MonitorDetailView(name: server.displayName, subtitle: "ssh \(server.alias)", result: infra.results[id], link: nil,
+        if let server = infra.servers.first(where: { $0.id == id }) {
+            MonitorDetailView(name: server.displayName, subtitle: "ssh \(server.alias)", result: infra.results[id],
                               checking: infra.checking.contains(id), recheck: { _ = recheck() })
         }
     }

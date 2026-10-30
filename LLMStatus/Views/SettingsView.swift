@@ -10,7 +10,7 @@ struct SettingsView: View {
         case general = "General"
         case providers = "Providers"
         case usage = "Usage"
-        case monitors = "Monitors"
+        case monitors = "Servers"
         case menuBar = "Menu bar"
     }
 

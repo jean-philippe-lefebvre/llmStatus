@@ -2,62 +2,6 @@ import Testing
 import Foundation
 @testable import LLMStatus
 
-@Suite("Website checks")
-struct WebsiteCheckerTests {
-    let site = WebsiteMonitor(url: "https://example.com")
-
-    @Test("URL without scheme gets https")
-    func parse() {
-        #expect(WebsiteMonitor.parse("example.com")?.absoluteString == "https://example.com")
-        #expect(WebsiteMonitor.parse("ftp://example.com") == nil)
-        #expect(WebsiteMonitor.parse("") == nil)
-    }
-
-    @Test("200 fast with valid certificate is operational")
-    func healthy() {
-        let result = WebsiteChecker.evaluate(code: 200, ms: 300, body: Data(), certificateExpiry: Date().addingTimeInterval(60 * 86400), site: site)
-        #expect(result.status == .operational)
-        #expect(result.summary == "200 · 300 ms")
-    }
-
-    @Test("5xx is critical, 4xx is a major outage")
-    func httpErrors() {
-        #expect(WebsiteChecker.evaluate(code: 503, ms: 100, body: Data(), certificateExpiry: nil, site: site).status == .critical)
-        #expect(WebsiteChecker.evaluate(code: 404, ms: 100, body: Data(), certificateExpiry: nil, site: site).status == .majorOutage)
-    }
-
-    @Test("Slow answer is degraded")
-    func slow() {
-        #expect(WebsiteChecker.evaluate(code: 200, ms: 5000, body: Data(), certificateExpiry: nil, site: site).status == .degraded)
-    }
-
-    @Test("Missing keyword is a major outage, found keyword is fine")
-    func keyword() {
-        var site = site
-        site.keyword = "Welcome"
-        #expect(WebsiteChecker.evaluate(code: 200, ms: 100, body: Data("<h1>welcome home</h1>".utf8), certificateExpiry: nil, site: site).status == .operational)
-        #expect(WebsiteChecker.evaluate(code: 200, ms: 100, body: Data("Error".utf8), certificateExpiry: nil, site: site).status == .majorOutage)
-    }
-
-    @Test("Certificate close to expiry escalates")
-    func certificate() {
-        let now = Date()
-        func status(days: Double) -> ServiceStatus {
-            WebsiteChecker.evaluate(code: 200, ms: 100, body: Data(), certificateExpiry: now.addingTimeInterval(days * 86400), site: site, now: now).status
-        }
-        #expect(status(days: 30) == .operational)
-        #expect(status(days: 10) == .degraded)
-        #expect(status(days: 3) == .majorOutage)
-        #expect(status(days: -1) == .critical)
-    }
-
-    @Test("Offline Mac is unknown, refused connection is critical")
-    func failures() {
-        #expect(WebsiteChecker.failure(URLError(.notConnectedToInternet)).status == .unknown)
-        #expect(WebsiteChecker.failure(URLError(.cannotConnectToHost)).status == .critical)
-    }
-}
-
 @Suite("Server checks")
 struct ServerCheckerTests {
     var server: ServerMonitor {
@@ -145,14 +89,14 @@ struct MonitorAlertTests {
     @Test("Alerts on going down, getting worse and recovering; never on unknown")
     func alerts() {
         let down = CheckResult(status: .critical, summary: "Timed out", items: [CheckItem(name: "Connection", status: .critical, value: "Timed out")])
-        let ok = CheckResult(status: .operational, summary: "200 · 90 ms")
+        let ok = CheckResult(status: .operational, summary: "Disk 45% · load 0.50")
         let unknown = CheckResult(status: .unknown, summary: "No connection")
-        #expect(InfraMonitor.alert(name: "Site", previous: .operational, result: down)?.title == "Site: Critical")
-        #expect(InfraMonitor.alert(name: "Site", previous: nil, result: down) != nil)
-        #expect(InfraMonitor.alert(name: "Site", previous: .degraded, result: down) != nil)
-        #expect(InfraMonitor.alert(name: "Site", previous: .critical, result: down) == nil)
-        #expect(InfraMonitor.alert(name: "Site", previous: .critical, result: ok)?.title == "Site: Recovered")
-        #expect(InfraMonitor.alert(name: "Site", previous: .operational, result: ok) == nil)
-        #expect(InfraMonitor.alert(name: "Site", previous: .operational, result: unknown) == nil)
+        #expect(InfraMonitor.alert(name: "Server", previous: .operational, result: down)?.title == "Server: Critical")
+        #expect(InfraMonitor.alert(name: "Server", previous: nil, result: down) != nil)
+        #expect(InfraMonitor.alert(name: "Server", previous: .degraded, result: down) != nil)
+        #expect(InfraMonitor.alert(name: "Server", previous: .critical, result: down) == nil)
+        #expect(InfraMonitor.alert(name: "Server", previous: .critical, result: ok)?.title == "Server: Recovered")
+        #expect(InfraMonitor.alert(name: "Server", previous: .operational, result: ok) == nil)
+        #expect(InfraMonitor.alert(name: "Server", previous: .operational, result: unknown) == nil)
     }
 }

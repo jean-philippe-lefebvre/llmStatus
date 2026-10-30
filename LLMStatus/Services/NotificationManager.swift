@@ -70,7 +70,7 @@ class NotificationManager {
         notifiedRecoveries.remove(providerID)
     }
 
-    /// Alert for a website or server whose status changed (see `InfraMonitor.alert`).
+    /// Alert for a server whose status changed (see `InfraMonitor.alert`).
     func sendMonitorNotification(title: String, body: String, identifier: String) async {
         await deliver(title: title, body: body, identifier: identifier)
     }
