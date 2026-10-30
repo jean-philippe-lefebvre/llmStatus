@@ -5,13 +5,31 @@ import SwiftUI
 @Observable
 class AppSettings {
     @ObservationIgnored
-    @AppStorage("refreshInterval") var refreshInterval: TimeInterval = 60
+    @AppStorage("refreshInterval") var refreshInterval: TimeInterval = 60 {
+        didSet {
+            if oldValue != refreshInterval { onMonitorSettingChange?(.refreshInterval(refreshInterval)) }
+        }
+    }
     @ObservationIgnored
     @AppStorage("launchAtLogin") private var launchAtLoginPreference: Bool = false
     private var launchAtLoginTick = 0
     var launchAtLoginStatusMessage: String?
     @ObservationIgnored
-    @AppStorage("notificationsEnabled") var notificationsEnabled: Bool = true
+    @AppStorage("notificationsEnabled") var notificationsEnabled: Bool = true {
+        didSet {
+            if oldValue != notificationsEnabled { onMonitorSettingChange?(.notificationsEnabled(notificationsEnabled)) }
+        }
+    }
+    /// Runtime side effects are wired at launch, independent of the popover's view lifecycle.
+    @ObservationIgnored var onMonitorSettingChange: ((MonitorSettingChange) -> Void)?
+
+    /// Polling starts last, so its first fetch already skips disabled providers.
+    func applyMonitorSettings() {
+        onMonitorSettingChange?(.disabledProviders(disabledProviderIDs))
+        onMonitorSettingChange?(.notificationsEnabled(notificationsEnabled))
+        onMonitorSettingChange?(.menuBarProvider(menuBarProvider))
+        onMonitorSettingChange?(.refreshInterval(refreshInterval))
+    }
     /// Popover look (`AppAppearance` raw value); the menu bar icon always follows macOS.
     @ObservationIgnored
     @AppStorage(AppAppearance.key) var appearanceRaw: String = AppAppearance.system.rawValue
@@ -20,6 +38,35 @@ class AppSettings {
     var appearance: AppAppearance {
         get { _ = appearanceTick; return AppAppearance(rawValue: appearanceRaw) ?? .system }
         set { appearanceRaw = newValue.rawValue; appearanceTick += 1 }
+    }
+
+    @ObservationIgnored
+    @AppStorage(AppBackground.key) var backgroundRaw: String = AppBackground.system.rawValue
+    private var backgroundTick = 0
+
+    var background: AppBackground {
+        get { _ = backgroundTick; return AppBackground(rawValue: backgroundRaw) ?? .system }
+        set { backgroundRaw = newValue.rawValue; backgroundTick += 1 }
+    }
+
+    var systemReducesTransparency = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+    var usesSolidBackground: Bool { background.isSolid(reduceTransparency: systemReducesTransparency) }
+    @ObservationIgnored private var transparencyObserver: NSObjectProtocol?
+
+    func watchSystemTransparency() {
+        guard transparencyObserver == nil else { return }
+        systemReducesTransparency = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+        transparencyObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.systemReducesTransparency = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+        }
+    }
+
+    deinit {
+        if let transparencyObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(transparencyObserver)
+        }
     }
 
     /// macOS dark mode, kept current by `watchSystemAppearance`.
@@ -35,7 +82,11 @@ class AppSettings {
         }
     }
     @ObservationIgnored
-    @AppStorage("menuBarProvider") var menuBarProvider: String = "all"
+    @AppStorage("menuBarProvider") var menuBarProvider: String = "all" {
+        didSet {
+            if oldValue != menuBarProvider { onMonitorSettingChange?(.menuBarProvider(menuBarProvider)) }
+        }
+    }
     /// What the menu bar shows next to the cloud (`MenuBarIndicator` raw value).
     @ObservationIgnored
     @AppStorage("menuBarIndicator") var menuBarIndicatorRaw: String = MenuBarIndicator.status.rawValue
@@ -78,7 +129,11 @@ class AppSettings {
         set { menuBarAlertThreshold = newValue; menuBarTick += 1 }
     }
     @ObservationIgnored
-    @AppStorage("disabledProviders") var disabledProviders: String = ""
+    @AppStorage("disabledProviders") var disabledProviders: String = "" {
+        didSet {
+            if oldValue != disabledProviders { onMonitorSettingChange?(.disabledProviders(disabledProviderIDs)) }
+        }
+    }
     /// Triggers SwiftUI re-render when disabled providers change
     private var disabledProvidersTick = 0
     @ObservationIgnored
@@ -367,5 +422,34 @@ enum AppAppearance: String, CaseIterable, Identifiable {
     static var currentIsDark: Bool {
         let saved = AppAppearance(rawValue: UserDefaults.standard.string(forKey: key) ?? "") ?? .system
         return saved == .dark || (saved == .system && systemIsDark)
+    }
+}
+
+/// Settings that need to reach the running monitor as soon as they are saved.
+enum MonitorSettingChange: Equatable {
+    case refreshInterval(TimeInterval)
+    case notificationsEnabled(Bool)
+    case menuBarProvider(String)
+    case disabledProviders(Set<String>)
+}
+
+/// The popover's native material, or an opaque background.
+enum AppBackground: String, CaseIterable, Identifiable {
+    case system, translucent, solid
+
+    static let key = "background"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .system: "Same as macOS"
+        case .translucent: "Translucent"
+        case .solid: "Solid"
+        }
+    }
+
+    func isSolid(reduceTransparency: Bool) -> Bool {
+        self == .solid || (self == .system && reduceTransparency)
     }
 }

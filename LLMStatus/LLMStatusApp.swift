@@ -23,12 +23,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         settings.reconcileLaunchAtLogin()
 
-        monitor.notificationsEnabled = settings.notificationsEnabled
-        monitor.notifyProviderID = settings.menuBarProvider
+        settings.onMonitorSettingChange = { [weak monitor] change in
+            guard let monitor else { return }
+            switch change {
+            case .refreshInterval(let interval):
+                monitor.startPolling(interval: interval)
+            case .notificationsEnabled(let enabled):
+                monitor.notificationsEnabled = enabled
+                monitor.infra.notificationsEnabled = enabled
+            case .menuBarProvider(let providerID):
+                monitor.notifyProviderID = providerID
+            case .disabledProviders(let ids):
+                monitor.disabledProviderIDs = ids
+            }
+        }
 
         // Request notification permission on first launch
         Task { await monitor.notificationManager.requestPermission() }
-        monitor.disabledProviderIDs = settings.disabledProviderIDs
 
         // Restore watched components from persisted settings
         let watchedMap = settings.watchedComponents
@@ -44,7 +55,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !settings.providerOrderIDs.isEmpty {
             monitor.reorderProviders(orderedIDs: settings.providerOrderIDs)
         }
-        monitor.startPolling(interval: settings.refreshInterval)
         settings.materializeUsageGroups()
         monitor.usage.groups = settings.usageGroups
         monitor.usage.remoteHosts = settings.remoteHosts
@@ -54,8 +64,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         monitor.infra.servers = settings.servers
         monitor.infra.websiteInterval = settings.websiteInterval
         monitor.infra.serverInterval = settings.serverInterval
-        monitor.infra.notificationsEnabled = settings.notificationsEnabled
         monitor.infra.isOnline = { network.isConnected }
+        settings.applyMonitorSettings()
         monitor.infra.startPolling()
 
         statusBarController = StatusBarController(

@@ -48,19 +48,6 @@ final class StatusBarController: NSObject {
         let n = network
         let popover = popover
         let view = StatusPopoverView(monitor: m, settings: s, network: n)
-            .onChange(of: s.refreshInterval) { _, newInterval in
-                m.startPolling(interval: newInterval)
-            }
-            .onChange(of: s.notificationsEnabled) { _, enabled in
-                m.notificationsEnabled = enabled
-                m.infra.notificationsEnabled = enabled
-            }
-            .onChange(of: s.menuBarProvider) { _, providerID in
-                m.notifyProviderID = providerID
-            }
-            .onChange(of: s.disabledProviders) { _, _ in
-                m.disabledProviderIDs = s.disabledProviderIDs
-            }
         let themed = ThemedRoot(settings: s, content: view) { dark in
             Self.apply(dark: dark, to: popover)
         }
@@ -72,6 +59,7 @@ final class StatusBarController: NSObject {
         popover.behavior = .transient
         Self.apply(dark: s.isDark, to: popover)
         s.watchSystemAppearance()
+        s.watchSystemTransparency()
     }
 
     private func setupButton() {
@@ -290,9 +278,11 @@ private struct ThemedRoot<Content: View>: View {
     var body: some View {
         content
             .environment(\.colorScheme, settings.isDark ? .dark : .light)
-            // Solid: the popover's glass lets the window behind tint the header (a dark
-            // window greys a light header, a bright one lightens a dark header).
-            .background(Color(nsColor: .windowBackgroundColor))
+            .background {
+                if settings.usesSolidBackground {
+                    Color(nsColor: .windowBackgroundColor)
+                }
+            }
             .onChange(of: settings.isDark) { _, dark in apply(dark) }
     }
 }

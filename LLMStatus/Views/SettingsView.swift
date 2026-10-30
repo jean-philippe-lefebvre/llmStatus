@@ -39,6 +39,10 @@ struct SettingsView: View {
                         ForEach(AppAppearance.allCases) { Text($0.label).tag($0) }
                     }
 
+                    Picker("Background", selection: $settings.background) {
+                        ForEach(AppBackground.allCases) { Text($0.label).tag($0) }
+                    }
+
                     // Launch at login
                     Toggle("Launch at login", isOn: $settings.launchAtLogin)
 
@@ -81,7 +85,6 @@ struct SettingsView: View {
                                         get: { settings.isProviderEnabled(provider.id) },
                                         set: { _ in
                                             settings.toggleProvider(provider.id)
-                                            monitor.disabledProviderIDs = settings.disabledProviderIDs
                                         }
                                     ))
                                 }
