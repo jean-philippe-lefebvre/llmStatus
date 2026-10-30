@@ -134,6 +134,8 @@ struct SettingsView: View {
                 }
             }
             .formStyle(.grouped)
+            // The grouped form paints its own opaque backdrop: hide it so a translucent popover stays translucent.
+            .scrollContentBackground(settings.usesSolidBackground ? .visible : .hidden)
         }
         .onAppear {
             settings.refreshLaunchAtLoginStatus()
