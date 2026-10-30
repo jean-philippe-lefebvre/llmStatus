@@ -174,6 +174,7 @@ struct UsageRowView: View {
     /// A reset cannot be undone: always ask, and say how much of it would go unused.
     static func confirmReset(_ credit: CodexResets.Credit, usage: SubscriptionUsage) -> Bool {
         let alert = NSAlert()
+        alert.window.appearance = AppAppearance.nsAppearance(dark: AppAppearance.currentIsDark)
         alert.messageText = "Use a Codex reset?"
         var text = "This restores your Codex 5-hour and weekly limits now. It cannot be undone."
         if let weekly = usage.weekly {

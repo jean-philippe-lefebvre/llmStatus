@@ -35,6 +35,10 @@ struct SettingsView: View {
                         }
                     }
 
+                    Picker("Appearance", selection: $settings.appearance) {
+                        ForEach(AppAppearance.allCases) { Text($0.label).tag($0) }
+                    }
+
                     // Launch at login
                     Toggle("Launch at login", isOn: $settings.launchAtLogin)
 

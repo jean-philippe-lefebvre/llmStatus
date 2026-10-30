@@ -33,10 +33,20 @@ final class StatusBarController: NSObject {
         }
     }
 
+    /// Always explicit (left unset, the popover copies the menu bar's look), and on the open
+    /// window and hosted view too, which otherwise keep the look they opened with.
+    private static func apply(dark: Bool, to popover: NSPopover) {
+        let look = AppAppearance.nsAppearance(dark: dark)
+        popover.appearance = look
+        popover.contentViewController?.view.appearance = look
+        popover.contentViewController?.view.window?.appearance = look
+    }
+
     private func setupPopover() {
         let m = monitor
         let s = settings
         let n = network
+        let popover = popover
         let view = StatusPopoverView(monitor: m, settings: s, network: n)
             .onChange(of: s.refreshInterval) { _, newInterval in
                 m.startPolling(interval: newInterval)
@@ -51,12 +61,17 @@ final class StatusBarController: NSObject {
             .onChange(of: s.disabledProviders) { _, _ in
                 m.disabledProviderIDs = s.disabledProviderIDs
             }
+        let themed = ThemedRoot(settings: s, content: view) { dark in
+            Self.apply(dark: dark, to: popover)
+        }
 
         // The popover takes the size of its content (see FittingScrollView) instead of a fixed height.
-        let hosting = NSHostingController(rootView: view)
+        let hosting = NSHostingController(rootView: themed)
         hosting.sizingOptions = .preferredContentSize
         popover.contentViewController = hosting
         popover.behavior = .transient
+        Self.apply(dark: s.isDark, to: popover)
+        s.watchSystemAppearance()
     }
 
     private func setupButton() {
@@ -83,6 +98,7 @@ final class StatusBarController: NSObject {
             Task { await monitor.usage.refreshIfStale() }
             NotificationCenter.default.post(name: .popoverWillOpen, object: nil)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            Self.apply(dark: settings.isDark, to: popover)
             popover.contentViewController?.view.window?.makeKey()
         }
     }
@@ -119,6 +135,7 @@ final class StatusBarController: NSObject {
         if !popover.isShown, let button = statusItem.button {
             NotificationCenter.default.post(name: .popoverWillOpen, object: nil)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            Self.apply(dark: settings.isDark, to: popover)
             popover.contentViewController?.view.window?.makeKey()
         }
         NotificationCenter.default.post(name: .showSettings, object: nil)
@@ -260,5 +277,22 @@ final class StatusBarController: NSObject {
         }
         image.isTemplate = false
         return image
+    }
+}
+
+/// Reads the appearance inside a view body, so a change reaches the open popover: the root
+/// view built in `setupPopover` is created once and never sees new values.
+private struct ThemedRoot<Content: View>: View {
+    let settings: AppSettings
+    let content: Content
+    let apply: (Bool) -> Void
+
+    var body: some View {
+        content
+            .environment(\.colorScheme, settings.isDark ? .dark : .light)
+            // Solid: the popover's glass lets the window behind tint the header (a dark
+            // window greys a light header, a bright one lightens a dark header).
+            .background(Color(nsColor: .windowBackgroundColor))
+            .onChange(of: settings.isDark) { _, dark in apply(dark) }
     }
 }

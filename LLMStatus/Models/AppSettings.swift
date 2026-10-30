@@ -12,6 +12,28 @@ class AppSettings {
     var launchAtLoginStatusMessage: String?
     @ObservationIgnored
     @AppStorage("notificationsEnabled") var notificationsEnabled: Bool = true
+    /// Popover look (`AppAppearance` raw value); the menu bar icon always follows macOS.
+    @ObservationIgnored
+    @AppStorage(AppAppearance.key) var appearanceRaw: String = AppAppearance.system.rawValue
+    private var appearanceTick = 0
+
+    var appearance: AppAppearance {
+        get { _ = appearanceTick; return AppAppearance(rawValue: appearanceRaw) ?? .system }
+        set { appearanceRaw = newValue.rawValue; appearanceTick += 1 }
+    }
+
+    /// macOS dark mode, kept current by `watchSystemAppearance`.
+    var systemIsDark = AppAppearance.systemIsDark
+
+    var isDark: Bool { appearance == .dark || (appearance == .system && systemIsDark) }
+
+    func watchSystemAppearance() {
+        DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("AppleInterfaceThemeChangedNotification"), object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.systemIsDark = AppAppearance.systemIsDark
+        }
+    }
     @ObservationIgnored
     @AppStorage("menuBarProvider") var menuBarProvider: String = "all"
     /// What the menu bar shows next to the cloud (`MenuBarIndicator` raw value).
@@ -314,4 +336,36 @@ class AppSettings {
         ("5 min", 300),
         ("10 min", 600),
     ]
+}
+
+/// Light, dark, or the macOS setting, for the popover and the app's alerts.
+enum AppAppearance: String, CaseIterable, Identifiable {
+    case system, light, dark
+
+    static let key = "appearance"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .system: "Same as macOS"
+        case .light: "Light"
+        case .dark: "Dark"
+        }
+    }
+
+    static var systemIsDark: Bool {
+        UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
+    }
+
+    /// Always explicit: a popover left without one takes the menu bar's look, not the system's.
+    static func nsAppearance(dark: Bool) -> NSAppearance? {
+        NSAppearance(named: dark ? .darkAqua : .aqua)
+    }
+
+    /// The saved choice resolved to light or dark, for views that do not hold `AppSettings` (alerts).
+    static var currentIsDark: Bool {
+        let saved = AppAppearance(rawValue: UserDefaults.standard.string(forKey: key) ?? "") ?? .system
+        return saved == .dark || (saved == .system && systemIsDark)
+    }
 }
