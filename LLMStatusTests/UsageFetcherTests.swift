@@ -507,5 +507,10 @@ struct UsageAccountsTests {
     #expect(ClaudeRenewal.arguments.first == "-p")
     #expect(ClaudeRenewal.isSignedOut("Failed to authenticate: OAuth session expired and could not be refreshed"))
     #expect(!ClaudeRenewal.isSignedOut("Request timed out"))
+    // On a host: the folder becomes CLAUDE_CONFIG_DIR, quoted, and the call keeps the same arguments.
+    let remote = ClaudeRenewal.remoteScript(folder: "~/agent's/.claude")
+    #expect(remote.contains(#"CLAUDE_CONFIG_DIR=$HOME/'agent'\''s/.claude'"#))
+    #expect(remote.contains("--no-session-persistence"))
+    #expect(!ClaudeRenewal.remoteScript(folder: nil).contains("CLAUDE_CONFIG_DIR"))
     #expect(ClaudeRenewal.candidates(home: "/Users/x").contains("/Users/x/.local/bin/claude"))
 }

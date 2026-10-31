@@ -288,11 +288,11 @@ struct StatusPopoverView: View {
         collapsedUsageGroups.split(separator: ",").contains { $0 == group.id.uuidString }
     }
 
-    /// Only this Mac's Claude login can be renewed here: the CLI that owns it runs on this Mac.
+    /// Claude logins, on this Mac or on an SSH host: the CLI that owns the login renews it.
     private func renewAction(_ usage: SubscriptionUsage, in group: UsageGroup) -> (() -> Void)? {
         guard let id = usage.accountID,
               let account = group.accounts.first(where: { $0.id == id }),
-              account.isLocal, account.kind == .claude else { return nil }
+              account.kind == .claude else { return nil }
         return { Task { await monitor.usage.renew(id) } }
     }
 

@@ -70,8 +70,14 @@ enum RemoteAccountUsage {
             usage.error = switch error {
             case "missing": "No \(usage.kind.name) login in \(folder) on \(host)"
             case "unreadable": "Cannot read \(folder) on \(host)"
+            case "expired" where object["renewable"] as? Bool == false:
+                ClaudeRenewal.signedOutMessage(host: host)
             case "expired": "Token expired on \(host), run \(cli) there"
             default: "Usage unavailable from \(host)"
+            }
+            if error == "expired", usage.kind == .claude {
+                usage.tokenExpired = true
+                usage.signedOut = object["renewable"] as? Bool == false
             }
             return usage
         }
@@ -220,7 +226,7 @@ if kind == "claude":
         out(error="missing", folder=folder)
     plan = oauth.get("subscriptionType")
     if oauth.get("expiresAt") and oauth["expiresAt"] / 1000 < time.time():
-        out(error="expired", plan=plan)
+        out(error="expired", plan=plan, renewable=bool(oauth.get("refreshToken")))
     status, body = call("https://api.anthropic.com/api/oauth/usage",
                         {"Authorization": "Bearer " + oauth["accessToken"], "anthropic-beta": "oauth-2025-04-20"})
     keep = ("five_hour", "seven_day")

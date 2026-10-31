@@ -461,26 +461,26 @@ class UsageMonitor {
     /// Accounts whose Claude Code login is being renewed (Renew button).
     var renewing: Set<UUID> = []
 
-    /// Has the CLI renew this Mac's Claude login, then reads its limits again. A login the CLI
-    /// cannot renew opens its sign-in in Terminal instead; polling picks up the new token.
+    /// Has the CLI renew a Claude login (this Mac's, or over SSH on its host), then reads its limits
+    /// again. A login the CLI cannot renew opens its sign-in in Terminal instead; polling picks it up.
     @MainActor
     func renew(_ accountID: UUID) async {
         guard !renewing.contains(accountID),
               let account = enabledAccounts.first(where: { $0.id == accountID }),
-              account.isLocal, account.kind == .claude else { return }
+              account.kind == .claude else { return }
         let index = { self.usages.firstIndex { $0.accountID == accountID } }
         if let i = index(), usages[i].signedOut {
-            if let error = ClaudeRenewal.signIn() { usages[i].error = error }
+            if let error = ClaudeRenewal.signIn(account) { usages[i].error = error }
             return
         }
         renewing.insert(accountID)
         defer { renewing.remove(accountID) }
-        switch await ClaudeRenewal.renew() {
+        switch await ClaudeRenewal.renew(account) {
         case .renewed:
             await fetch([account])
         case .signedOut:
             guard let i = index() else { return }
-            usages[i].error = ClaudeRenewal.signedOutMessage
+            usages[i].error = ClaudeRenewal.signedOutMessage(host: account.host)
             usages[i].signedOut = true
             usages[i].checkedAt = Date()
         case .failed(let error):
