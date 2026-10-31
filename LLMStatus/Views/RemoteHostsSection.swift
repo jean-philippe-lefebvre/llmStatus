@@ -38,7 +38,7 @@ struct RemoteHostsSection: View {
                     .foregroundStyle(.orange)
             }
 
-            Text("Adds what this Mac's Codex account spends on these hosts to its breakdown. Click a host to rename it or add folders to search. Codex homes, Hermes and codex-usage.jsonl files are found by content under /home, /root, /srv, /opt and Docker volumes (sudo -n when allowed). Read-only: only token totals and app or project names leave the host.")
+            Text("Adds this Mac's Codex usage on these hosts to its breakdown (Codex, Hermes and codex-usage.jsonl, found by content). Read-only: only token totals and names leave the host. Click a host to edit it.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

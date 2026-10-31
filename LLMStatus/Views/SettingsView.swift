@@ -8,10 +8,8 @@ struct SettingsView: View {
 
     enum Tab: String, CaseIterable {
         case general = "General"
-        case providers = "Providers"
+        case status = "Status"
         case usage = "Usage"
-        case monitors = "Servers"
-        case menuBar = "Menu bar"
     }
 
     var body: some View {
@@ -21,57 +19,54 @@ struct SettingsView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .controlSize(.mini)
+            .controlSize(.small)
             .padding(.horizontal, 12)
             .padding(.top, 8)
 
             Form {
                 switch tab {
                 case .general:
-                    // Refresh interval
-                    Picker("Refresh interval", selection: $settings.refreshInterval) {
-                        ForEach(AppSettings.intervalOptions, id: \.value) { option in
-                            Text(option.label).tag(option.value)
+                    Section("App") {
+                        Picker("Refresh interval", selection: $settings.refreshInterval) {
+                            ForEach(AppSettings.intervalOptions, id: \.value) { option in
+                                Text(option.label).tag(option.value)
+                            }
+                        }
+
+                        Toggle("Launch at login", isOn: $settings.launchAtLogin)
+
+                        if let message = settings.launchAtLoginStatusMessage {
+                            Text(message)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Toggle("Notifications", isOn: $settings.notificationsEnabled)
+
+                        Picker("Appearance", selection: $settings.appearance) {
+                            ForEach(AppAppearance.allCases) { Text($0.label).tag($0) }
+                        }
+
+                        Picker("Background", selection: $settings.background) {
+                            ForEach(AppBackground.allCases) { Text($0.label).tag($0) }
                         }
                     }
 
-                    Picker("Appearance", selection: $settings.appearance) {
-                        ForEach(AppAppearance.allCases) { Text($0.label).tag($0) }
-                    }
+                    MenuBarSettingsSection(settings: settings, monitor: monitor,
+                                           providers: orderedProviders.filter { settings.isProviderEnabled($0.id) })
 
-                    Picker("Background", selection: $settings.background) {
-                        ForEach(AppBackground.allCases) { Text($0.label).tag($0) }
-                    }
-
-                    // Launch at login
-                    Toggle("Launch at login", isOn: $settings.launchAtLogin)
-
-                    if let message = settings.launchAtLoginStatusMessage {
-                        Text(message)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    // Notifications
-                    Toggle("Notifications enabled", isOn: $settings.notificationsEnabled)
-
-                    // Logs
                     Section {
+                        LabeledContent("Version") {
+                            Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
+                                .foregroundStyle(.secondary)
+                        }
                         Button("Open logs folder") {
                             let logsDir = FileManager.default.homeDirectoryForCurrentUser
                                 .appendingPathComponent("Library/Logs/LLMStatus")
                             NSWorkspace.shared.open(logsDir)
                         }
                     }
-
-                    // App version
-                    Section {
-                        LabeledContent("Version") {
-                            Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                case .providers:
+                case .status:
                     // Providers — drag & drop reorder + enable/disable
                     Section("Providers") {
                         List {
@@ -121,11 +116,8 @@ struct SettingsView: View {
                             .pickerStyle(.menu)
                         }
                     }
-                case .monitors:
+
                     MonitorsSettingsSection(settings: settings, infra: monitor.infra)
-                case .menuBar:
-                    MenuBarSettingsSection(settings: settings, monitor: monitor,
-                                           providers: orderedProviders.filter { settings.isProviderEnabled($0.id) })
                 case .usage:
                     // Subscriptions shown, by group (this Mac's logins and logins on SSH hosts)
                     UsageAccountsSection(settings: settings, usage: monitor.usage)

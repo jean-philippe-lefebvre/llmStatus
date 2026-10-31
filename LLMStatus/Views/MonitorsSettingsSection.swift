@@ -33,7 +33,7 @@ struct MonitorsSettingsSection: View {
                 Picker("Check every", selection: $settings.serverCheckInterval) {
                     ForEach(AppSettings.serverIntervalOptions, id: \.value) { Text($0.label).tag($0.value) }
                 }
-                Text("Over SSH with your key (no password prompt): SSH answer time, disk space and inodes, memory, load and failed systemd units, plus the services, Docker containers and ports you list. Click a server to list them and set disk thresholds. Read-only; uses sudo -n when allowed (needed for Docker unless your user is in the docker group).")
+                Text("Read-only check over SSH with your key: disk, memory, load, failed units, plus the services, containers and ports you list. Click a server to edit it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

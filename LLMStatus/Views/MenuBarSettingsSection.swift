@@ -13,7 +13,7 @@ struct MenuBarSettingsSection: View {
         let accounts = MenuBarContent.accounts(monitor.usage.sections)
         let mode = settings.menuBarIndicator
 
-        Section("Selected") {
+        Section("Menu bar") {
             HStack {
                 Text(mode.title)
                 Spacer()
@@ -73,9 +73,9 @@ struct MenuBarSettingsSection: View {
                 .onTapGesture { settings.menuBarIndicator = template }
             }
         } header: {
-            Text("All templates")
+            Text("Templates")
         } footer: {
-            Text("Drawn with your current usage. The cloud's color is the providers' status; the options above apply to the selected template.")
+            Text("Drawn with your current usage. The cloud's color is the providers' status.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
