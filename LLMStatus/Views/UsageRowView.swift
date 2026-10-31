@@ -109,14 +109,16 @@ struct UsageRowView: View {
 
             if usage.tokenExpired, let renew {
                 HStack(spacing: 6) {
-                    Button(renewing ? "Renewing…" : "Renew with Claude Code", action: renew)
+                    Button(usage.signedOut ? "Sign in to Claude Code" : renewing ? "Renewing…" : "Renew with Claude Code",
+                           action: renew)
                         .controlSize(.small)
                         .disabled(renewing)
                     if renewing {
                         ProgressView().controlSize(.mini)
                     }
                 }
-                .help("Sends one short request with Claude Code (Haiku) so it renews its login.")
+                .help(usage.signedOut ? "Opens claude auth login in Terminal; the row updates once you are signed in."
+                                      : "Sends one short request with Claude Code (Haiku) so it renews its login.")
             }
 
             if let useReset, let credits = usage.resetCredits, !credits.isEmpty || resetError != nil {

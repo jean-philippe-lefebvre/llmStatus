@@ -62,6 +62,8 @@ struct SubscriptionUsage: Identifiable, Equatable {
     var title: String?
     /// The login's access token is expired: the CLI renews it on its next request.
     var tokenExpired = false
+    /// The login cannot be renewed (no refresh token left): only a new sign-in brings it back.
+    var signedOut = false
     /// When the limits shown were read; older than now when they are kept through an error.
     var fetchedAt: Date?
     /// Last attempt, successful or not.
@@ -98,6 +100,7 @@ enum UsageFetcher {
         struct OAuth: Decodable {
             let accessToken: String
             let expiresAt: Double?
+            let refreshToken: String?
             let subscriptionType: String?
         }
         let claudeAiOauth: OAuth?
@@ -123,9 +126,14 @@ enum UsageFetcher {
         }
         usage.plan = oauth.subscriptionType?.capitalized
         if let expiresAt = oauth.expiresAt, Date(timeIntervalSince1970: expiresAt / 1000) < Date() {
+            usage.tokenExpired = true
+            guard oauth.refreshToken?.isEmpty == false else {
+                usage.error = ClaudeRenewal.signedOutMessage
+                usage.signedOut = true
+                return usage
+            }
             // Claude Code renews its short-lived token only when it sends a request.
             usage.error = "Token expired: Claude Code renews it on its next request"
-            usage.tokenExpired = true
             return usage
         }
         var request = URLRequest(url: claudeURL)
@@ -453,21 +461,33 @@ class UsageMonitor {
     /// Accounts whose Claude Code login is being renewed (Renew button).
     var renewing: Set<UUID> = []
 
-    /// Has the CLI renew this Mac's Claude login, then reads its limits again.
+    /// Has the CLI renew this Mac's Claude login, then reads its limits again. A login the CLI
+    /// cannot renew opens its sign-in in Terminal instead; polling picks up the new token.
     @MainActor
     func renew(_ accountID: UUID) async {
         guard !renewing.contains(accountID),
               let account = enabledAccounts.first(where: { $0.id == accountID }),
               account.isLocal, account.kind == .claude else { return }
-        renewing.insert(accountID)
-        defer { renewing.remove(accountID) }
-        if let error = await ClaudeRenewal.renew(),
-           let index = usages.firstIndex(where: { $0.accountID == accountID }) {
-            usages[index].error = error
-            usages[index].checkedAt = Date()
+        let index = { self.usages.firstIndex { $0.accountID == accountID } }
+        if let i = index(), usages[i].signedOut {
+            if let error = ClaudeRenewal.signIn() { usages[i].error = error }
             return
         }
-        await fetch([account])
+        renewing.insert(accountID)
+        defer { renewing.remove(accountID) }
+        switch await ClaudeRenewal.renew() {
+        case .renewed:
+            await fetch([account])
+        case .signedOut:
+            guard let i = index() else { return }
+            usages[i].error = ClaudeRenewal.signedOutMessage
+            usages[i].signedOut = true
+            usages[i].checkedAt = Date()
+        case .failed(let error):
+            guard let i = index() else { return }
+            usages[i].error = error
+            usages[i].checkedAt = Date()
+        }
     }
 
     /// Reads one host now (Settings "Test"), updating its status only.

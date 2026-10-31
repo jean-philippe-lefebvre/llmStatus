@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 
 /// Renews this Mac's Claude Code token by sending one tiny request through the `claude` CLI.
 /// The CLI refreshes its own login (with its own locking), so LLM Status never touches the
@@ -25,17 +25,48 @@ enum ClaudeRenewal {
         return path.hasPrefix("/") && FileManager.default.isExecutableFile(atPath: path) ? URL(fileURLWithPath: path) : nil
     }
 
-    /// Nil on success, else a short reason for the row.
-    static func renew() async -> String? {
+    enum Outcome: Equatable {
+        case renewed
+        /// The CLI has no refresh token left: only `claude auth login` brings the login back.
+        case signedOut
+        case failed(String)
+    }
+
+    static let signedOutMessage = "Claude Code is signed out: sign in again"
+
+    static func renew() async -> Outcome {
         await Task.detached(priority: .userInitiated) {
-            guard let cli = locateCLI() else { return "Claude Code CLI not found" }
-            guard let output = run(cli, arguments, timeout: 90) else { return "Claude Code did not answer" }
+            guard let cli = locateCLI() else { return .failed("Claude Code CLI not found") }
+            guard let output = run(cli, arguments, timeout: 90) else { return .failed("Claude Code did not answer") }
             guard output.status == 0 else {
                 FileLogger.shared.error("Renew failed with status \(output.status)", source: "Claude")
-                return "Claude Code could not renew its login: run claude in a terminal"
+                return isSignedOut(String(decoding: output.data, as: UTF8.self))
+                    ? .signedOut : .failed("Claude Code could not renew its login: run claude in a terminal")
             }
-            return nil
+            return .renewed
         }.value
+    }
+
+    /// What the CLI prints when its login cannot be refreshed any more.
+    static func isSignedOut(_ output: String) -> Bool {
+        let text = output.lowercased()
+        return text.contains("could not be refreshed") || text.contains("not logged in") || text.contains("/login")
+    }
+
+    /// Opens `claude auth login` in Terminal (it needs the browser and may ask to paste a code).
+    /// Nil when it opened, else a short reason for the row.
+    static func signIn() -> String? {
+        guard let cli = locateCLI() else { return "Claude Code CLI not found" }
+        let script = FileManager.default.temporaryDirectory.appendingPathComponent("claude-sign-in.command")
+        let quoted = "'" + cli.path.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        let body = "#!/bin/zsh -l\n\(quoted) auth login --claudeai\n"
+        do {
+            try body.write(to: script, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: script.path)
+        } catch {
+            return "Could not open the Claude Code sign-in"
+        }
+        return NSWorkspace.shared.open(script) ? nil : "Could not open Terminal"
     }
 
     /// Runs a process from the temporary folder with stdin closed; nil when it could not start or timed out.
@@ -50,7 +81,8 @@ enum ClaudeRenewal {
         process.environment = environment
         let output = Pipe()
         process.standardOutput = output
-        process.standardError = FileHandle.nullDevice
+        // Errors are read too: they tell a login that cannot be refreshed from other failures.
+        process.standardError = output
         process.standardInput = FileHandle.nullDevice
         do { try process.run() } catch { return nil }
         var timedOut = false

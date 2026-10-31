@@ -505,5 +505,7 @@ struct UsageAccountsTests {
     #expect(ClaudeRenewal.arguments.contains("--no-session-persistence"))
     #expect(ClaudeRenewal.arguments.contains("haiku"))
     #expect(ClaudeRenewal.arguments.first == "-p")
+    #expect(ClaudeRenewal.isSignedOut("Failed to authenticate: OAuth session expired and could not be refreshed"))
+    #expect(!ClaudeRenewal.isSignedOut("Request timed out"))
     #expect(ClaudeRenewal.candidates(home: "/Users/x").contains("/Users/x/.local/bin/claude"))
 }
