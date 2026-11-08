@@ -380,6 +380,7 @@ class UsageMonitor {
         await fetch(due.filter(\.isLocal))
         await refreshBreakdowns(accounts)
         await remote
+        autoRenewExpired()
     }
 
     @MainActor
@@ -460,21 +461,47 @@ class UsageMonitor {
 
     /// Accounts whose Claude Code login is being renewed (Renew button).
     var renewing: Set<UUID> = []
+    /// Expired Claude logins are renewed without a click (Settings > Usage).
+    @ObservationIgnored var autoRenew = true
+    /// Last automatic attempt per account: a failing login is retried every half hour, not every poll.
+    @ObservationIgnored private var lastAutoRenew: [UUID: Date] = [:]
+    static let autoRenewRetry: TimeInterval = 30 * 60
+
+    /// Renews the expired Claude logins that can be renewed; never opens a sign-in by itself.
+    @MainActor
+    private func autoRenewExpired() {
+        guard autoRenew else { return }
+        let now = Date()
+        for account in enabledAccounts where account.kind == .claude && !renewing.contains(account.id) {
+            guard let usage = usages.first(where: { $0.accountID == account.id }),
+                  usage.tokenExpired, !usage.signedOut,
+                  lastAutoRenew[account.id].map({ now.timeIntervalSince($0) > Self.autoRenewRetry }) ?? true
+            else { continue }
+            lastAutoRenew[account.id] = now
+            Task { await renew(account.id, automatic: true) }
+        }
+    }
 
     /// Has the CLI renew a Claude login (this Mac's, or over SSH on its host), then reads its limits
     /// again. A login the CLI cannot renew opens its sign-in in Terminal instead; polling picks it up.
     @MainActor
-    func renew(_ accountID: UUID) async {
+    func renew(_ accountID: UUID, automatic: Bool = false) async {
         guard !renewing.contains(accountID),
               let account = enabledAccounts.first(where: { $0.id == accountID }),
               account.kind == .claude else { return }
         let index = { self.usages.firstIndex { $0.accountID == accountID } }
         if let i = index(), usages[i].signedOut {
-            if let error = ClaudeRenewal.signIn(account) { usages[i].error = error }
+            if !automatic, let error = ClaudeRenewal.signIn(account) { usages[i].error = error }
             return
         }
         renewing.insert(accountID)
         defer { renewing.remove(accountID) }
+        // `/usage` first (no model request); the short Haiku request only if the token is still expired.
+        if await ClaudeRenewal.renew(account, light: true) != .signedOut {
+            await fetch([account])
+            if let i = index(), !usages[i].tokenExpired || usages[i].signedOut { return }
+            FileLogger.shared.warning("/usage left the token expired, sending the Haiku request", source: "Claude")
+        }
         switch await ClaudeRenewal.renew(account) {
         case .renewed:
             await fetch([account])

@@ -13,7 +13,11 @@ enum ClaudeRenewal {
     }
 
     /// Arguments of the renewing call: the smallest model, no session file left in the logs.
+    /// It counts against the plan and starts its 5-hour window, so it is only the fallback.
     static let arguments = ["-p", "--model", "haiku", "--no-session-persistence", "Reply with OK."]
+    /// Tried first: `/usage` reads the plan's limits through the CLI's login, which refreshes the
+    /// token on the way, with no model request (nothing counted, no window started).
+    static let lightArguments = ["-p", "--no-session-persistence", "/usage"]
 
     static func locateCLI() -> URL? {
         if let path = candidates().first(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
@@ -39,13 +43,14 @@ enum ClaudeRenewal {
         host.map { "Claude Code is signed out on \($0): sign in again" } ?? signedOutMessage
     }
 
-    static func renew(_ account: UsageAccount) async -> Outcome {
-        guard let host = account.host else { return await renew() }
+    static func renew(_ account: UsageAccount, light: Bool = false) async -> Outcome {
+        let arguments = light ? lightArguments : arguments
+        guard let host = account.host else { return await renew(arguments) }
         return await Task.detached(priority: .userInitiated) {
             guard RemoteUsage.isValidHost(host) else { return .failed("Invalid SSH host") }
             guard let output = run(URL(fileURLWithPath: "/usr/bin/ssh"),
                                    ["-o", "BatchMode=yes", "-o", "ConnectTimeout=8", "--", host, "sh -s"],
-                                   input: remoteScript(folder: account.folder), timeout: 90)
+                                   input: remoteScript(folder: account.folder, arguments: arguments), timeout: 90)
             else { return .failed("\(host) did not answer") }
             switch output.status {
             case 0: return .renewed
@@ -61,7 +66,7 @@ enum ClaudeRenewal {
 
     /// POSIX sh run on the host: finds `claude` (installers, then the login shell's PATH) and sends
     /// the renewing call from /tmp, on the account's folder when it is not ~/.claude.
-    static func remoteScript(folder: String?) -> String {
+    static func remoteScript(folder: String?, arguments: [String] = arguments) -> String {
         var lines = ["cd /tmp 2>/dev/null"]
         if let folder, RemoteAccountUsage.isValidFolder(folder) {
             let path = folder.hasPrefix("~/") ? "$HOME/" + shellQuote(String(folder.dropFirst(2))) : shellQuote(folder)
@@ -83,7 +88,7 @@ enum ClaudeRenewal {
         "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
-    static func renew() async -> Outcome {
+    static func renew(_ arguments: [String] = arguments) async -> Outcome {
         await Task.detached(priority: .userInitiated) {
             guard let cli = locateCLI() else { return .failed("Claude Code CLI not found") }
             guard let output = run(cli, arguments, timeout: 90) else { return .failed("Claude Code did not answer") }

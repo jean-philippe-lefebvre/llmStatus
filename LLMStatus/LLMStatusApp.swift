@@ -35,6 +35,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 monitor.notifyProviderID = providerID
             case .disabledProviders(let ids):
                 monitor.disabledProviderIDs = ids
+            case .autoRenewClaude(let enabled):
+                monitor.usage.autoRenew = enabled
             }
         }
 

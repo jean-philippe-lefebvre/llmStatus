@@ -123,6 +123,15 @@ struct SettingsView: View {
                     UsageAccountsSection(settings: settings, usage: monitor.usage)
 
                     RemoteHostsSection(settings: settings, usage: monitor.usage)
+
+                    Section {
+                        Toggle("Renew Claude logins automatically", isOn: $settings.autoRenewClaude)
+                    } footer: {
+                        Text("When a Claude Code login expires (about every 8 hours if you work in the Claude app), it is renewed through the claude CLI, here or on its SSH host. It tries /usage first, which sends no model request.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
             .formStyle(.grouped)

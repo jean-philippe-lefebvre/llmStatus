@@ -19,7 +19,7 @@ struct AppSettingsTests {
     @Test("Runtime settings dispatch at launch and only when their saved value changes")
     func monitorSettingChanges() {
         let defaults = UserDefaults.standard
-        let keys = ["refreshInterval", "notificationsEnabled", "menuBarProvider", "disabledProviders"]
+        let keys = ["refreshInterval", "notificationsEnabled", "menuBarProvider", "disabledProviders", "autoRenewClaude"]
         let saved = keys.map { defaults.object(forKey: $0) }
         defer {
             for (key, value) in zip(keys, saved) { defaults.set(value, forKey: key) }
@@ -28,12 +28,13 @@ struct AppSettingsTests {
         defaults.set(true, forKey: "notificationsEnabled")
         defaults.set("all", forKey: "menuBarProvider")
         defaults.set("", forKey: "disabledProviders")
+        defaults.set(true, forKey: "autoRenewClaude")
 
         let settings = AppSettings()
         var changes: [MonitorSettingChange] = []
         settings.onMonitorSettingChange = { changes.append($0) }
         settings.applyMonitorSettings()
-        #expect(changes == [.disabledProviders([]), .notificationsEnabled(true),
+        #expect(changes == [.autoRenewClaude(true), .disabledProviders([]), .notificationsEnabled(true),
                             .menuBarProvider("all"), .refreshInterval(60)])
 
         changes = []

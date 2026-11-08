@@ -22,9 +22,17 @@ class AppSettings {
     }
     /// Runtime side effects are wired at launch, independent of the popover's view lifecycle.
     @ObservationIgnored var onMonitorSettingChange: ((MonitorSettingChange) -> Void)?
+    /// Renew expired Claude Code logins without a click (`UsageMonitor.autoRenew`).
+    @ObservationIgnored
+    @AppStorage("autoRenewClaude") var autoRenewClaude: Bool = true {
+        didSet {
+            if oldValue != autoRenewClaude { onMonitorSettingChange?(.autoRenewClaude(autoRenewClaude)) }
+        }
+    }
 
     /// Polling starts last, so its first fetch already skips disabled providers.
     func applyMonitorSettings() {
+        onMonitorSettingChange?(.autoRenewClaude(autoRenewClaude))
         onMonitorSettingChange?(.disabledProviders(disabledProviderIDs))
         onMonitorSettingChange?(.notificationsEnabled(notificationsEnabled))
         onMonitorSettingChange?(.menuBarProvider(menuBarProvider))
@@ -413,6 +421,7 @@ enum MonitorSettingChange: Equatable {
     case notificationsEnabled(Bool)
     case menuBarProvider(String)
     case disabledProviders(Set<String>)
+    case autoRenewClaude(Bool)
 }
 
 /// The popover's native material, or an opaque background.
