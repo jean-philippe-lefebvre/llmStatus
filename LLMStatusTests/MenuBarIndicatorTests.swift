@@ -58,9 +58,9 @@ struct MenuBarIndicatorTests {
 
     @Test("Gauges and text cover every subscription with a weekly limit")
     func everySubscription() {
-        #expect(MenuBarContent.pieces(.gauges, accounts: sample, chosen: nil, threshold: 70) == [.gauges([[45], [0], [75]])])
+        #expect(MenuBarContent.pieces(.gauges, accounts: sample, chosen: nil, threshold: 70) == [.gauges([.init(values: [45]), .init(values: [0]), .init(values: [75])])])
         #expect(MenuBarContent.pieces(.gauges, accounts: sample, chosen: nil, threshold: 70, sessionBars: true)
-                == [.gauges([[5, 45], [0], [3, 75]])])
+                == [.gauges([.init(values: [5, 45]), .init(values: [0]), .init(values: [3, 75])])])
         #expect(MenuBarContent.pieces(.allAccounts, accounts: sample, chosen: nil, threshold: 70) == [
             .text("C "), .percent("45", 45), .separator(" · "), .text("X "), .percent("0", 0),
             .separator(" · "), .text("I "), .percent("75", 75),

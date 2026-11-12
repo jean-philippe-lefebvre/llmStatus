@@ -30,6 +30,14 @@ struct MenuBarAccount: Equatable {
     var short: String
     var weekly: SubscriptionUsage.Window?
     var session: SubscriptionUsage.Window?
+    /// The service's status when it is degraded or down: its gauges take that color.
+    var issue: ServiceStatus?
+}
+
+/// One subscription's mini gauges: 5h then weekly (or weekly alone), and the service's issue.
+struct GaugeGroup: Equatable {
+    var values: [Double]
+    var issue: ServiceStatus?
 }
 
 /// Pieces of the menu bar item after the cloud. Percent colors follow the usage gauges.
@@ -41,14 +49,15 @@ enum MenuBarPiece: Equatable {
     case separator(String)
     /// Vertical gauges (0...100), one group per subscription: 5h then weekly when the 5h one is
     /// shown (two values), weekly alone otherwise.
-    case gauges([[Double]])
+    case gauges([GaugeGroup])
 }
 
 enum MenuBarContent {
     /// The subscriptions shown in the popover, with short labels: the kind's letter (C, X) in the
     /// first group, the group's initial in the others ("I" for Index), plus the kind's letter
     /// when that group has both kinds.
-    static func accounts(_ sections: [(group: UsageGroup, usages: [SubscriptionUsage])]) -> [MenuBarAccount] {
+    static func accounts(_ sections: [(group: UsageGroup, usages: [SubscriptionUsage])],
+                         issue: (SubscriptionUsage.Kind) -> ServiceStatus? = { _ in nil }) -> [MenuBarAccount] {
         sections.enumerated().flatMap { index, section in
             let kinds = Set(section.usages.map(\.kind))
             return section.usages.map { usage in
@@ -56,7 +65,7 @@ enum MenuBarContent {
                 let groupLetter = section.group.name.first.map { String($0).uppercased() } ?? ""
                 let short = index == 0 ? kindLetter : groupLetter + (kinds.count > 1 ? kindLetter : "")
                 return MenuBarAccount(id: usage.accountID, name: usage.displayName, short: short,
-                                      weekly: usage.weekly, session: usage.session)
+                                      weekly: usage.weekly, session: usage.session, issue: issue(usage.kind))
             }
         }
     }
@@ -87,7 +96,8 @@ enum MenuBarContent {
             return pieces
         case .gauges:
             return measured.isEmpty ? nil : [.gauges(measured.map { account in
-                (sessionBars ? account.session.map { [$0.percent] } ?? [] : []) + [account.weekly!.percent]
+                GaugeGroup(values: (sessionBars ? account.session.map { [$0.percent] } ?? [] : []) + [account.weekly!.percent],
+                           issue: account.issue)
             })]
         case .allAccounts:
             guard !measured.isEmpty else { return nil }

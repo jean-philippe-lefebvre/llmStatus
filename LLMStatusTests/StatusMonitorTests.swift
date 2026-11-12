@@ -67,6 +67,31 @@ struct StatusMonitorTests {
         #expect(monitor.providers.contains { $0.id == "xai" })
     }
 
+    @Test("Subscription bars follow Claude Code and Codex, not the rest of the status page")
+    func serviceIssue() {
+        func provider(_ id: String, _ status: ServiceStatus, _ components: [ServiceComponent]) -> ServiceProvider {
+            ServiceProvider(id: id, name: id, shortName: id, statusURL: URL(string: "https://example.com")!,
+                            apiBaseURL: URL(string: "https://example.com/api/v2")!, fetcherType: .statuspage,
+                            currentStatus: status, lastChecked: Date(), incidents: [], components: components)
+        }
+        let anthropic = provider("anthropic", .majorOutage, [
+            ServiceComponent(id: "a", name: "claude.ai", status: .majorOutage),
+            ServiceComponent(id: "b", name: "Claude Code", status: .operational),
+        ])
+        let openai = provider("openai", .degraded, [
+            ServiceComponent(id: "g", name: "ChatGPT", status: .degraded, children: [
+                ServiceComponent(id: "c", name: "Codex", status: .degraded),
+            ]),
+            ServiceComponent(id: "d", name: "Codex API", status: .critical),
+        ])
+        #expect(StatusMonitor.serviceIssue(for: .claude, providers: [anthropic, openai]) == nil)
+        #expect(StatusMonitor.serviceIssue(for: .codex, providers: [anthropic, openai]) == .critical)
+        // No matching component: the provider's own status; a disabled provider: nothing.
+        #expect(StatusMonitor.serviceIssue(for: .claude, providers: [provider("anthropic", .degraded, [])]) == .degraded)
+        #expect(StatusMonitor.serviceIssue(for: .codex, providers: [anthropic]) == nil)
+        #expect(StatusMonitor.serviceIssue(for: .claude, providers: [provider("anthropic", .unknown, [])]) == nil)
+    }
+
     // MARK: - Helpers
 
     private func makeProviders(_ statuses: [ServiceStatus]) -> [ServiceProvider] {

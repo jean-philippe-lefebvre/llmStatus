@@ -134,7 +134,8 @@ struct StatusPopoverView: View {
                                                      useReset: resetAction(usage, in: section.group),
                                                      resetting: usage.accountID.map(monitor.usage.resetting.contains) ?? false,
                                                      resetError: usage.accountID.flatMap { monitor.usage.resetErrors[$0] },
-                                                     sessionBar: settings.showsSessionBar)
+                                                     sessionBar: settings.showsSessionBar,
+                                                     issue: monitor.serviceIssue(for: usage.kind))
                                     }
                                 }
                             }

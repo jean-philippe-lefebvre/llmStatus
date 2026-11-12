@@ -61,6 +61,23 @@ class StatusMonitor {
         return issue
     }
 
+    /// Status of the service a subscription runs on, when it has an issue (degraded or worse).
+    func serviceIssue(for kind: SubscriptionUsage.Kind) -> ServiceStatus? {
+        Self.serviceIssue(for: kind, providers: providers.filter { !disabledProviderIDs.contains($0.id) })
+    }
+
+    /// Claude reads Anthropic's "Claude Code" component, Codex OpenAI's "Codex" ones (worst of
+    /// them); without such a component, the provider's own status. Nil when operational, unknown
+    /// or the provider is off: an issue elsewhere (claude.ai, Sora…) does not color the bars.
+    static func serviceIssue(for kind: SubscriptionUsage.Kind, providers: [ServiceProvider]) -> ServiceStatus? {
+        let (providerID, component) = kind == .claude ? ("anthropic", "Claude Code") : ("openai", "Codex")
+        guard let provider = providers.first(where: { $0.id == providerID }) else { return nil }
+        func flatten(_ items: [ServiceComponent]) -> [ServiceComponent] { items.flatMap { [$0] + flatten($0.children) } }
+        let matching = flatten(provider.components).filter { !$0.isGroup && $0.name.localizedCaseInsensitiveContains(component) }
+        let status = matching.isEmpty ? provider.currentStatus : matching.map(\.status).max { $0.severity < $1.severity }!
+        return status.severity >= 2 ? status : nil
+    }
+
     /// Short label for the menu bar — provider short name or "LLM".
     func menuBarLabel(for providerID: String) -> String {
         if providerID == "all" {

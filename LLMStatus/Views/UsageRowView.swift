@@ -12,11 +12,13 @@ struct UsageRowView: View {
     var resetError: String?
     /// The 5h limit as a thinner teal bar right above the weekly one.
     var sessionBar = false
+    /// The service's status when degraded or down (Claude Code, Codex): the bars take its color.
+    var issue: ServiceStatus?
     @State private var isExpanded: Bool
 
     init(usage: SubscriptionUsage, startExpanded: Bool = false, renew: (() -> Void)? = nil, renewing: Bool = false,
          useReset: ((CodexResets.Credit) -> Void)? = nil, resetting: Bool = false, resetError: String? = nil,
-         sessionBar: Bool = false) {
+         sessionBar: Bool = false, issue: ServiceStatus? = nil) {
         self.usage = usage
         self.renew = renew
         self.renewing = renewing
@@ -24,6 +26,7 @@ struct UsageRowView: View {
         self.resetting = resetting
         self.resetError = resetError
         self.sessionBar = sessionBar
+        self.issue = issue
         _isExpanded = State(initialValue: startExpanded)
     }
 
@@ -38,6 +41,13 @@ struct UsageRowView: View {
                     Text(plan)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+                }
+
+                if let issue {
+                    Label(issue.label, systemImage: issue.sfSymbol)
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(issue.color)
+                        .help("\(usage.kind == .claude ? "Claude Code" : "Codex") status: \(issue.label)")
                 }
 
                 Spacer()
@@ -77,10 +87,10 @@ struct UsageRowView: View {
             if let weekly = usage.weekly {
                 VStack(spacing: 2) {
                     if sessionBar, let session = usage.session {
-                        Self.bar(session.percent, height: 3, calm: .teal)
+                        Self.bar(session.percent, height: 3, calm: .teal, issue: issue)
                             .help(Self.sessionLabel(session))
                     }
-                    Self.bar(weekly.percent, height: 5)
+                    Self.bar(weekly.percent, height: 5, issue: issue)
                 }
             }
 
@@ -270,12 +280,13 @@ struct UsageRowView: View {
     }
 
     /// `calm` is the color under the warning level; orange and red stay the same for every bar.
-    static func bar(_ percent: Double, height: CGFloat, calm: Color = .green) -> some View {
+    /// A service issue overrides both with the status color.
+    static func bar(_ percent: Double, height: CGFloat, calm: Color = .green, issue: ServiceStatus? = nil) -> some View {
         GeometryReader { proxy in
             ZStack(alignment: .leading) {
                 Capsule().fill(.quaternary)
                 Capsule()
-                    .fill(percent < 70 ? calm : color(for: percent))
+                    .fill(issue?.color ?? (percent < 70 ? calm : color(for: percent)))
                     .frame(width: proxy.size.width * min(max(percent, 0), 100) / 100)
             }
         }

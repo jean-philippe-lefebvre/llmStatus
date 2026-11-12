@@ -142,7 +142,7 @@ final class StatusBarController: NSObject {
         guard let button = statusItem.button else { return }
         let status = monitor.menuBarStatus(for: settings.menuBarProvider)
         let label = monitor.menuBarLabel(for: settings.menuBarProvider)
-        let accounts = MenuBarContent.accounts(monitor.usage.sections)
+        let accounts = MenuBarContent.accounts(monitor.usage.sections, issue: monitor.serviceIssue)
         let mode = settings.menuBarIndicator
         let pieces = MenuBarContent.pieces(mode, accounts: accounts, chosen: settings.menuBarAccountID,
                                            threshold: settings.menuBarThreshold, sessionBars: settings.showsSessionBar)
@@ -168,7 +168,7 @@ final class StatusBarController: NSObject {
             button.imagePosition = .imageLeading
             return
         }
-        var gauges: [[Double]] = []
+        var gauges: [GaugeGroup] = []
         let title = NSMutableAttributedString(string: showCloud ? " " : "")
         let font = NSFont.menuBarFont(ofSize: 0)
         for piece in pieces {
@@ -202,11 +202,14 @@ final class StatusBarController: NSObject {
 
     /// The cloud (if any), then one group of thin vertical gauges per subscription (5h in teal, then
     /// weekly right next to it, when the 5h one is shown), each group optionally followed by its percentages.
-    private static func withGauges(_ cloud: NSImage?, _ groups: [[Double]], numbers: Bool, in button: NSButton) -> NSImage {
+    /// A subscription whose service is degraded or down draws its gauges and numbers in the status color.
+    private static func withGauges(_ cloud: NSImage?, _ gaugeGroups: [GaugeGroup], numbers: Bool, in button: NSButton) -> NSImage {
+        let groups = gaugeGroups.map(\.values)
         let barWidth: CGFloat = 4, pairGap: CGFloat = 1.5, barHeight: CGFloat = 14, height: CGFloat = 18
         let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .regular)
         // "45" for a single gauge, "18/45" for 5h and weekly.
-        let labels = groups.map { values in
+        let labels = gaugeGroups.map { group in
+            let values = group.values
             let label = NSMutableAttributedString()
             for (index, value) in values.enumerated() {
                 if index > 0 {
@@ -214,6 +217,7 @@ final class StatusBarController: NSObject {
                 }
                 var attributes = percentAttributes(value, font: font)
                 if values.count > 1, index == 0, value < 70 { attributes[.foregroundColor] = NSColor.systemTeal }
+                if let issue = group.issue { attributes[.foregroundColor] = issue.nsColor }
                 label.append(NSAttributedString(string: "\(Int(value.rounded()))", attributes: attributes))
             }
             return label
@@ -237,7 +241,7 @@ final class StatusBarController: NSObject {
                     NSBezierPath(roundedRect: base, xRadius: 1, yRadius: 1).fill()
                     let fill = max(1.5, barHeight * min(max(value, 0), 100) / 100)
                     let calm: NSColor = values.count > 1 && bar == 0 ? .systemTeal : .systemGreen
-                    (value >= 90 ? NSColor.systemRed : value >= 70 ? NSColor.systemOrange : calm).setFill()
+                    (gaugeGroups[index].issue?.nsColor ?? (value >= 90 ? NSColor.systemRed : value >= 70 ? NSColor.systemOrange : calm)).setFill()
                     NSBezierPath(roundedRect: NSRect(x: barX, y: base.minY, width: barWidth, height: fill), xRadius: 1, yRadius: 1).fill()
                     barX += barWidth + pairGap
                 }

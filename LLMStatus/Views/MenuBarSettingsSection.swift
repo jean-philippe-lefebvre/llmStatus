@@ -10,7 +10,7 @@ struct MenuBarSettingsSection: View {
     let providers: [ServiceProvider]
 
     var body: some View {
-        let accounts = MenuBarContent.accounts(monitor.usage.sections)
+        let accounts = MenuBarContent.accounts(monitor.usage.sections, issue: monitor.serviceIssue)
         let mode = settings.menuBarIndicator
 
         Section("Menu bar") {
