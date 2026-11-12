@@ -145,7 +145,7 @@ final class StatusBarController: NSObject {
         let accounts = MenuBarContent.accounts(monitor.usage.sections)
         let mode = settings.menuBarIndicator
         let pieces = MenuBarContent.pieces(mode, accounts: accounts, chosen: settings.menuBarAccountID,
-                                           threshold: settings.menuBarThreshold)
+                                           threshold: settings.menuBarThreshold, sessionBars: settings.showsSessionBar)
 
         let key = "\(status)|\(label)|\(String(describing: pieces))|\(settings.menuBarShowsCloud)|\(settings.menuBarGaugeNumbers)"
         guard key != lastIconKey else { return }
@@ -168,7 +168,7 @@ final class StatusBarController: NSObject {
             button.imagePosition = .imageLeading
             return
         }
-        var gauges: [Double] = []
+        var gauges: [[Double]] = []
         let title = NSMutableAttributedString(string: showCloud ? " " : "")
         let font = NSFont.menuBarFont(ofSize: 0)
         for piece in pieces {
@@ -200,32 +200,50 @@ final class StatusBarController: NSObject {
         return [.font: font, .foregroundColor: color]
     }
 
-    /// The cloud (if any), then one thin vertical gauge per subscription, each optionally followed
-    /// by its percentage.
-    private static func withGauges(_ cloud: NSImage?, _ values: [Double], numbers: Bool, in button: NSButton) -> NSImage {
-        let barWidth: CGFloat = 4, barHeight: CGFloat = 14, height: CGFloat = 18
+    /// The cloud (if any), then one group of thin vertical gauges per subscription (5h in teal, then
+    /// weekly right next to it, when the 5h one is shown), each group optionally followed by its percentages.
+    private static func withGauges(_ cloud: NSImage?, _ groups: [[Double]], numbers: Bool, in button: NSButton) -> NSImage {
+        let barWidth: CGFloat = 4, pairGap: CGFloat = 1.5, barHeight: CGFloat = 14, height: CGFloat = 18
         let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .regular)
-        let labels = values.map { NSAttributedString(string: "\(Int($0.rounded()))", attributes: percentAttributes($0, font: font)) }
-        let gap: CGFloat = numbers ? 7 : 2
+        // "45" for a single gauge, "18/45" for 5h and weekly.
+        let labels = groups.map { values in
+            let label = NSMutableAttributedString()
+            for (index, value) in values.enumerated() {
+                if index > 0 {
+                    label.append(NSAttributedString(string: "/", attributes: [.font: font, .foregroundColor: NSColor.secondaryLabelColor]))
+                }
+                var attributes = percentAttributes(value, font: font)
+                if values.count > 1, index == 0, value < 70 { attributes[.foregroundColor] = NSColor.systemTeal }
+                label.append(NSAttributedString(string: "\(Int(value.rounded()))", attributes: attributes))
+            }
+            return label
+        }
+        let gap: CGFloat = numbers ? 7 : groups.contains { $0.count > 1 } ? 4 : 2
         let lead = cloud.map { $0.size.width + 5 } ?? 0
-        let widths = values.indices.map { barWidth + (numbers ? 3 + ceil(labels[$0].size().width) : 0) }
-        let size = NSSize(width: lead + widths.reduce(0, +) + gap * CGFloat(values.count - 1), height: height)
+        let barsWidth = groups.map { CGFloat($0.count) * barWidth + CGFloat(max($0.count - 1, 0)) * pairGap }
+        let widths = groups.indices.map { barsWidth[$0] + (numbers ? 3 + ceil(labels[$0].size().width) : 0) }
+        let size = NSSize(width: lead + widths.reduce(0, +) + gap * CGFloat(max(groups.count - 1, 0)), height: height)
         let image = NSImage(size: size, flipped: false) { [weak button] rect in
             // Label colors follow the menu bar (light or dark), read when the image is drawn.
             let appearance = button?.effectiveAppearance ?? NSAppearance.currentDrawing()
             appearance.performAsCurrentDrawingAppearance {
             cloud?.draw(in: NSRect(x: 0, y: (rect.height - (cloud?.size.height ?? 0)) / 2, width: cloud?.size.width ?? 0, height: cloud?.size.height ?? 0))
             var x = lead
-            for (index, value) in values.enumerated() {
-                let base = NSRect(x: x, y: (rect.height - barHeight) / 2, width: barWidth, height: barHeight)
-                NSColor.labelColor.withAlphaComponent(0.25).setFill()
-                NSBezierPath(roundedRect: base, xRadius: 1, yRadius: 1).fill()
-                let fill = max(1.5, barHeight * min(max(value, 0), 100) / 100)
-                (value >= 90 ? NSColor.systemRed : value >= 70 ? NSColor.systemOrange : NSColor.systemGreen).setFill()
-                NSBezierPath(roundedRect: NSRect(x: x, y: base.minY, width: barWidth, height: fill), xRadius: 1, yRadius: 1).fill()
+            for (index, values) in groups.enumerated() {
+                var barX = x
+                for (bar, value) in values.enumerated() {
+                    let base = NSRect(x: barX, y: (rect.height - barHeight) / 2, width: barWidth, height: barHeight)
+                    NSColor.labelColor.withAlphaComponent(0.25).setFill()
+                    NSBezierPath(roundedRect: base, xRadius: 1, yRadius: 1).fill()
+                    let fill = max(1.5, barHeight * min(max(value, 0), 100) / 100)
+                    let calm: NSColor = values.count > 1 && bar == 0 ? .systemTeal : .systemGreen
+                    (value >= 90 ? NSColor.systemRed : value >= 70 ? NSColor.systemOrange : calm).setFill()
+                    NSBezierPath(roundedRect: NSRect(x: barX, y: base.minY, width: barWidth, height: fill), xRadius: 1, yRadius: 1).fill()
+                    barX += barWidth + pairGap
+                }
                 if numbers {
                     let label = labels[index]
-                    label.draw(at: NSPoint(x: x + barWidth + 3, y: (rect.height - label.size().height) / 2))
+                    label.draw(at: NSPoint(x: x + barsWidth[index] + 3, y: (rect.height - label.size().height) / 2))
                 }
                 x += widths[index] + gap
             }

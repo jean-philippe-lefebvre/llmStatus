@@ -133,7 +133,8 @@ struct StatusPopoverView: View {
                                                      renewing: usage.accountID.map(monitor.usage.renewing.contains) ?? false,
                                                      useReset: resetAction(usage, in: section.group),
                                                      resetting: usage.accountID.map(monitor.usage.resetting.contains) ?? false,
-                                                     resetError: usage.accountID.flatMap { monitor.usage.resetErrors[$0] })
+                                                     resetError: usage.accountID.flatMap { monitor.usage.resetErrors[$0] },
+                                                     sessionBar: settings.showsSessionBar)
                                     }
                                 }
                             }

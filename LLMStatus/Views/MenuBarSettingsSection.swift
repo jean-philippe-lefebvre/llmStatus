@@ -34,6 +34,10 @@ struct MenuBarSettingsSection: View {
                     get: { settings.menuBarGaugeNumbers },
                     set: { settings.menuBarGaugeNumbers = $0 }
                 ))
+                Toggle("5h gauge before each weekly one", isOn: Binding(
+                    get: { settings.showsSessionBar },
+                    set: { settings.showsSessionBar = $0 }
+                ))
             }
             if mode.needsAccount {
                 Picker("Subscription", selection: Binding(
@@ -89,7 +93,7 @@ struct MenuBarSettingsSection: View {
             cloudColor: status.nsColor,
             label: monitor.menuBarLabel(for: settings.menuBarProvider),
             pieces: MenuBarContent.pieces(template, accounts: accounts, chosen: settings.menuBarAccountID,
-                                          threshold: settings.menuBarThreshold),
+                                          threshold: settings.menuBarThreshold, sessionBars: settings.showsSessionBar),
             // Other templates show with the defaults; the selected one with its options.
             showCloud: selected ? settings.menuBarShowsCloud || status.severity >= 2 : true,
             gaugeNumbers: selected && settings.menuBarGaugeNumbers

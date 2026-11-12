@@ -39,8 +39,9 @@ enum MenuBarPiece: Equatable {
     case percent(String, Double)
     /// Dimmed separator.
     case separator(String)
-    /// One vertical gauge per subscription (0...100).
-    case gauges([Double])
+    /// Vertical gauges (0...100), one group per subscription: 5h then weekly when the 5h one is
+    /// shown (two values), weekly alone otherwise.
+    case gauges([[Double]])
 }
 
 enum MenuBarContent {
@@ -62,7 +63,7 @@ enum MenuBarContent {
 
     /// Nil when the mode has nothing to add: the item then shows the status label.
     static func pieces(_ mode: MenuBarIndicator, accounts: [MenuBarAccount], chosen: UUID?,
-                       threshold: Double, now: Date = Date()) -> [MenuBarPiece]? {
+                       threshold: Double, sessionBars: Bool = false, now: Date = Date()) -> [MenuBarPiece]? {
         let measured = accounts.filter { $0.weekly != nil }
         let busiest = measured.max { $0.weekly!.percent < $1.weekly!.percent }
         let picked = accounts.first { $0.id == chosen } ?? accounts.first { $0.session != nil } ?? accounts.first
@@ -85,7 +86,9 @@ enum MenuBarContent {
             if let session = picked?.session { pieces += [.separator(" | "), .percent(percent(session), session.percent)] }
             return pieces
         case .gauges:
-            return measured.isEmpty ? nil : [.gauges(measured.map { $0.weekly!.percent })]
+            return measured.isEmpty ? nil : [.gauges(measured.map { account in
+                (sessionBars ? account.session.map { [$0.percent] } ?? [] : []) + [account.weekly!.percent]
+            })]
         case .allAccounts:
             guard !measured.isEmpty else { return nil }
             return measured.enumerated().flatMap { index, account -> [MenuBarPiece] in

@@ -110,7 +110,15 @@ class AppSettings {
     /// Mini gauges followed by their percentage.
     @ObservationIgnored
     @AppStorage("menuBarGaugePercent") var menuBarGaugePercent: Bool = false
+    /// The 5h limit as a second bar under the weekly one (popover rows and menu bar mini gauges).
+    @ObservationIgnored
+    @AppStorage("usageSessionBar") var usageSessionBar: Bool = false
     private var menuBarTick = 0
+
+    var showsSessionBar: Bool {
+        get { _ = menuBarTick; return usageSessionBar }
+        set { usageSessionBar = newValue; menuBarTick += 1 }
+    }
 
     var menuBarShowsCloud: Bool {
         get { _ = menuBarTick; return menuBarCloud }

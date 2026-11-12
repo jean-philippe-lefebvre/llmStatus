@@ -10,16 +10,20 @@ struct UsageRowView: View {
     var useReset: ((CodexResets.Credit) -> Void)?
     var resetting = false
     var resetError: String?
+    /// The 5h limit as a thinner teal bar right above the weekly one.
+    var sessionBar = false
     @State private var isExpanded: Bool
 
     init(usage: SubscriptionUsage, startExpanded: Bool = false, renew: (() -> Void)? = nil, renewing: Bool = false,
-         useReset: ((CodexResets.Credit) -> Void)? = nil, resetting: Bool = false, resetError: String? = nil) {
+         useReset: ((CodexResets.Credit) -> Void)? = nil, resetting: Bool = false, resetError: String? = nil,
+         sessionBar: Bool = false) {
         self.usage = usage
         self.renew = renew
         self.renewing = renewing
         self.useReset = useReset
         self.resetting = resetting
         self.resetError = resetError
+        self.sessionBar = sessionBar
         _isExpanded = State(initialValue: startExpanded)
     }
 
@@ -71,15 +75,13 @@ struct UsageRowView: View {
             }
 
             if let weekly = usage.weekly {
-                GeometryReader { proxy in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(.quaternary)
-                        Capsule()
-                            .fill(Self.color(for: weekly.percent))
-                            .frame(width: proxy.size.width * min(max(weekly.percent, 0), 100) / 100)
+                VStack(spacing: 2) {
+                    if sessionBar, let session = usage.session {
+                        Self.bar(session.percent, height: 3, calm: .teal)
+                            .help(Self.sessionLabel(session))
                     }
+                    Self.bar(weekly.percent, height: 5)
                 }
-                .frame(height: 5)
             }
 
             HStack(spacing: 8) {
@@ -265,6 +267,19 @@ struct UsageRowView: View {
         guard let resetsAt = window.resetsAt else { return window.percent == 0 ? "\(used) · starts on next use" : used }
         guard let left = MenuBarContent.countdown(window, now: now), resetsAt > now else { return used }
         return "\(used) · resets in \(left)"
+    }
+
+    /// `calm` is the color under the warning level; orange and red stay the same for every bar.
+    static func bar(_ percent: Double, height: CGFloat, calm: Color = .green) -> some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule().fill(.quaternary)
+                Capsule()
+                    .fill(percent < 70 ? calm : color(for: percent))
+                    .frame(width: proxy.size.width * min(max(percent, 0), 100) / 100)
+            }
+        }
+        .frame(height: height)
     }
 
     static func color(for percent: Double) -> Color {
