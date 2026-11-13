@@ -152,8 +152,7 @@ final class StatusBarController: NSObject {
         lastIconKey = key
 
         Self.draw(on: button, cloud: Self.tintedMenuBarIcon(status.nsColor), label: label, pieces: pieces,
-                  // A provider issue brings the cloud back: its color is the only status signal.
-                  showCloud: settings.menuBarShowsCloud || status.severity >= 2, gaugeNumbers: settings.menuBarGaugeNumbers)
+                  showCloud: settings.menuBarShowsCloud, gaugeNumbers: settings.menuBarGaugeNumbers)
         button.toolTip = pieces != nil && (mode == .busiest || mode == .alert)
             ? MenuBarContent.busiestName(accounts).map { "Busiest: \($0)" } : "LLM Status"
     }

@@ -95,7 +95,7 @@ struct MenuBarSettingsSection: View {
             pieces: MenuBarContent.pieces(template, accounts: accounts, chosen: settings.menuBarAccountID,
                                           threshold: settings.menuBarThreshold, sessionBars: settings.showsSessionBar),
             // Other templates show with the defaults; the selected one with its options.
-            showCloud: selected ? settings.menuBarShowsCloud || status.severity >= 2 : true,
+            showCloud: selected ? settings.menuBarShowsCloud : true,
             gaugeNumbers: selected && settings.menuBarGaugeNumbers
         )
         .fixedSize()
